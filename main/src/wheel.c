@@ -1,7 +1,7 @@
 #include "./inc/wheel.h"
 
 /**
- * @brief motor moves in forward direction, with duty cycle = duty %
+ * @brief motor moves in forward direction
  */
 void wheel_forward(Wheel wheel)
 {
@@ -11,7 +11,7 @@ void wheel_forward(Wheel wheel)
 }
 
 /**
- * @brief motor moves in backward direction, with duty cycle = duty %
+ * @brief motor moves in backward direction
  */
 void wheel_backward(Wheel wheel)
 {
@@ -31,7 +31,7 @@ void wheel_stop(Wheel wheel)
 
 /**
  * @brief set motor speed
- * @param speed duty cycle (0 -> 100)
+ * @param speed duty cycle = duty %
  */
 void wheel_set_speed(Wheel *wheel, float speed) {
     wheel->speed = speed;

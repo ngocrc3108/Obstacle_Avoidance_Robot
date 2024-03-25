@@ -8,10 +8,10 @@
 #include "driver/mcpwm.h"
 #include "soc/mcpwm_periph.h"
 
-#define WHEEL_GPIO_A_LEFT 26
-#define WHEEL_GPIO_B_LEFT  27
-#define WHEEL_GPIO_A_RIGHT 18
-#define WHEEL_GPIO_B_RIGHT 5
+#define WHEEL_GPIO_A_LEFT 4
+#define WHEEL_GPIO_B_LEFT  18
+#define WHEEL_GPIO_A_RIGHT 27
+#define WHEEL_GPIO_B_RIGHT 26
 
 typedef struct {
     mcpwm_unit_t mcpwm_unit;
@@ -24,12 +24,12 @@ typedef struct {
 } Wheel;
 
 /**
- * @brief motor moves in forward direction, with duty cycle = duty %
+ * @brief motor moves in forward direction
  */
 void wheel_forward(Wheel wheel);
 
 /**
- * @brief motor moves in backward direction, with duty cycle = duty %
+ * @brief motor moves in backward direction
  */
 void wheel_backward(Wheel wheel);
 
@@ -38,6 +38,10 @@ void wheel_backward(Wheel wheel);
  */
 void wheel_stop(Wheel wheel);
 
+/**
+ * @brief set motor speed
+ * @param speed duty cycle = duty %
+ */
 void wheel_set_speed(Wheel *wheel, float speed);
 
 /**
