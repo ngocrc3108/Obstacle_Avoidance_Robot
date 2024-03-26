@@ -16,4 +16,6 @@ void car_go_backward();
 void car_turn_left();
 void car_turn_right();
 void car_stop();
+void car_turn_by_angle(float angle);
+void car_set_speed(float speed);
 #endif

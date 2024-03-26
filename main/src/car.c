@@ -51,3 +51,19 @@ void car_stop() {
     wheel_stop(car.left);
     wheel_stop(car.right);
 }
+
+void car_turn_by_angle(float angle) {
+    if(angle > 0) {
+        car_turn_right();
+        vTaskDelay(angle / 80.0 * 1000 / portTICK_PERIOD_MS); // 1s = 80*
+    } else if(angle < 0) {
+        car_turn_left();
+        vTaskDelay(- angle / 80.0 * 1000 / portTICK_PERIOD_MS); // 1s = 80*        
+    }
+    car_stop();
+}
+
+void car_set_speed(float speed) {
+    wheel_set_speed(&car.left, speed);
+    wheel_set_speed(&car.right, speed);
+}
