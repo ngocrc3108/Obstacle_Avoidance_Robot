@@ -1,5 +1,6 @@
 #include <stdio.h>
-#include "./inc/car.h"
+#include "car.h"
+#include "lidar.h"
 
 void app_main(void) {
     car_init();

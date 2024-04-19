@@ -1,4 +1,4 @@
-#include "../inc/car.h"
+#include "car.h"
 
 static Car car = {
     .left = {

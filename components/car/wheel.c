@@ -1,4 +1,4 @@
-#include "./inc/wheel.h"
+#include "wheel.h"
 
 /**
  * @brief motor moves in forward direction

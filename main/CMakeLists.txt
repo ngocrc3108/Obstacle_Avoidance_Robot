@@ -1,2 +1,3 @@
-idf_component_register(SRCS "main.c" "src/wheel.c" "src/car.c"
-                    INCLUDE_DIRS ".")
+idf_component_register(SRCS "main.c"
+                    INCLUDE_DIRS "." 
+                    REQUIRES lidar car)
