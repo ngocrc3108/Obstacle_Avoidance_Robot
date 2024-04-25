@@ -12,7 +12,7 @@
         "interface/ftdi/esp32_devkitj_v1.cfg",
         "target/esp32.cfg"
     ],
-    "idf.portWin": "COM6",
+    "idf.portWin": "COM8",
     "idf.pythonBinPathWin": "C:\\Espressif\\tools\\python_env\\idf5.2_py3.11_env\\Scripts\\python.exe",
     "idf.toolsPathWin": "C:\\Espressif\\tools",
     "idf.flashType": "UART",
@@ -20,6 +20,7 @@
         "mcpwm.h": "c",
         "mcpwm_prelude.h": "c",
         "mcpwm_periph.h": "c",
-        "car.h": "c"
+        "car.h": "c",
+        "gpio.h": "c"
     }
 }

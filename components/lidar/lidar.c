@@ -1,62 +1,53 @@
-/* UART Events Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include "lidar.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/uart.h"
 #include "esp_log.h"
 #include "hal/uart_hal.h"
+#include "driver/gpio.h"
 
 static const char *TAG = "uart_events";
 
-/**
- * This example shows how to use the UART driver to handle special UART events.
- *
- * It also reads data from UART0 directly, and echoes it to console.
- *
- * - Port: UART0
- * - Receive (Rx) buffer: on
- * - Transmit (Tx) buffer: off
- * - Flow control: off
- * - Event queue: on
- * - Pin assignment: TxD (default), RxD (default)
- */
+static void uart_event_task(void *pvParameters);
+static void uart_init();
+static void uart_enable_interrupt();
 
-#define EX_UART_NUM UART_NUM_0
+static QueueHandle_t lidar_uart_queue;
+Lidar_Data lidar;
 
-#define BUF_SIZE (1024)
-#define RD_BUF_SIZE (BUF_SIZE)
-static QueueHandle_t uart0_queue;
-
-void uart_event_task(void *pvParameters)
+static void uart_event_task(void *pvParameters)
 {
     uart_event_t event;
-    uint8_t* dtmp = (uint8_t*) malloc(RD_BUF_SIZE);
+    uint8_t* uart_data = (uint8_t*) malloc(BUF_SIZE);
     int count  = 0;
     for (;;) {
         //Waiting for UART event.
-        if (xQueueReceive(uart0_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
-            bzero(dtmp, RD_BUF_SIZE);
-            ESP_LOGI(TAG, "uart[%d] event:", EX_UART_NUM);
+        if (xQueueReceive(lidar_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
+            bzero(uart_data, BUF_SIZE);
+            ESP_LOGI(TAG, "uart[%d] event:", LIDAR_UART_NUM);
             switch (event.type) {
-            //Event of UART receving data
-            /*We'd better handler data event fast, there would be much more data events than
-            other types of events. If we take too much time on data event, the queue might
-            be full.*/
             case UART_DATA:
                 ESP_LOGI(TAG, "[UART DATA]: %d, COUNT: %d", event.size, count++);
-                uart_read_bytes(EX_UART_NUM, dtmp, event.size, portMAX_DELAY);
-                ESP_LOGI(TAG, "[DATA EVT]:");
-                uart_write_bytes(EX_UART_NUM, (const char*) dtmp, event.size);
+                uart_read_bytes(LIDAR_UART_NUM, uart_data, event.size, portMAX_DELAY);
+
+                // handle interrupt here
+                for(int i = 0; i <= (int)event.size - LIDAR_DATA_PACKET_SIZE; i += LIDAR_DATA_PACKET_SIZE) {
+                    uint16_t temp_distant = *(uint16_t*)(&uart_data[i + 3]);
+                    lidar.distant = (float)temp_distant / 4;
+
+                    uint16_t temp_angle_0 = (uint16_t)(uart_data[i+1]) >> 1;
+                    uint16_t temp_angle_1 = (uint16_t)(uart_data[i+2]) << 7;
+                    uint16_t temp_angle = temp_angle_0 | temp_angle_1;
+                    lidar.angle = (float)temp_angle / 64;
+
+                    ESP_LOGE("DEBUG", "i: %d", i);
+                    lidar_print();
+                }
+
                 break;
             //Event of HW FIFO overflow detected
             case UART_FIFO_OVF:
@@ -64,16 +55,16 @@ void uart_event_task(void *pvParameters)
                 // If fifo overflow happened, you should consider adding flow control for your application.
                 // The ISR has already reset the rx FIFO,
                 // As an example, we directly flush the rx buffer here in order to read more data.
-                uart_flush_input(EX_UART_NUM);
-                xQueueReset(uart0_queue);
+                uart_flush_input(LIDAR_UART_NUM);
+                xQueueReset(lidar_uart_queue);
                 break;
             //Event of UART ring buffer full
             case UART_BUFFER_FULL:
                 ESP_LOGI(TAG, "ring buffer full");
                 // If buffer full happened, you should consider increasing your buffer size
                 // As an example, we directly flush the rx buffer here in order to read more data.
-                uart_flush_input(EX_UART_NUM);
-                xQueueReset(uart0_queue);
+                uart_flush_input(LIDAR_UART_NUM);
+                xQueueReset(lidar_uart_queue);
                 break;
             //Event of UART RX break detected
             case UART_BREAK:
@@ -94,15 +85,43 @@ void uart_event_task(void *pvParameters)
             }
         }
     }
-    free(dtmp);
-    dtmp = NULL;
+    free(uart_data);
+    uart_data = NULL;
     vTaskDelete(NULL);
 }
 
-void lidar_init(void)
-{
+void lidar_init(void) {
     esp_log_level_set(TAG, ESP_LOG_INFO);
 
+    gpio_set_direction(LIDAR_MOTOR_CONTROL_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 0);
+
+    uart_init();
+
+    uint8_t startCommand[] = {0xA5, 0x20};
+	uint8_t expected_response[] = {0xA5, 0x5A, 0x05, 0x00, 0x00, 0x40, 0x81};
+    uint8_t buffer[100] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+    int ret = uart_write_bytes(LIDAR_UART_NUM, startCommand, sizeof(startCommand));
+    ESP_LOGI(TAG, "WRITE CMD LEN: %d", ret);
+
+    ret = uart_read_bytes(LIDAR_UART_NUM, buffer, 7, 5000 / portTICK_PERIOD_MS);
+    ESP_LOGI(TAG, "READ RESPONSE LEN: %d", ret);
+    ESP_LOGI(TAG, "RESPONSE: ");
+    for(uint8_t i = 0; i < ret; i++)
+        printf("%x ", buffer[i]);
+        
+    if(memcmp(buffer, expected_response, sizeof(expected_response)) != 0) {
+        ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
+        return;
+    } else {
+        gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
+    }
+
+    uart_enable_interrupt();
+}
+
+static void uart_init() {
     /* Configure parameters of an UART driver,
      * communication pins and install the driver */
     uart_config_t uart_config = {
@@ -114,22 +133,28 @@ void lidar_init(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
     //Install UART driver, and get the queue.
-    uart_driver_install(EX_UART_NUM, BUF_SIZE * 2, BUF_SIZE * 2, 20, &uart0_queue, 0);
-    uart_param_config(EX_UART_NUM, &uart_config);
+    uart_driver_install(LIDAR_UART_NUM, BUF_SIZE, 0, LIDAR_UART_QUEUE_SIZE, &lidar_uart_queue, 0);
+    uart_param_config(LIDAR_UART_NUM, &uart_config);
 
-    //Set UART log level
-    esp_log_level_set(TAG, ESP_LOG_INFO);
-    //Set UART pins (using UART0 default pins ie no changes.)
-    uart_set_pin(EX_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(LIDAR_UART_NUM, LIDAR_UART_TX, LIDAR_UART_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+}
 
+static void uart_enable_interrupt() {
     uart_intr_config_t uart_intr = {
         .rx_timeout_thresh = 1,
-        .rxfifo_full_thresh  = 120,
+        .rxfifo_full_thresh  = 1,
         .intr_enable_mask = UART_INTR_RXFIFO_TOUT
     };
-    uart_intr_config(EX_UART_NUM, &uart_intr);
-    uart_enable_rx_intr(EX_UART_NUM);
+    uart_intr_config(LIDAR_UART_NUM, &uart_intr);
+    uart_enable_rx_intr(LIDAR_UART_NUM);
 
     //Create a task to handler UART event from ISR
     xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, 12, NULL);
+}
+
+void lidar_print() {
+    if(lidar.distant == 0)
+        ESP_LOGE(TAG, "\nangle = %f\ndistant = %f\n", lidar.angle, lidar.distant);
+    else
+        ESP_LOGI(TAG, "\nangle = %f\ndistant = %f\n", lidar.angle, lidar.distant);
 }
