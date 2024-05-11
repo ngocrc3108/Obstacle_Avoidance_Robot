@@ -11,7 +11,7 @@
 #include "driver/gpio.h"
 #include "math.h"
 
-#define MAX_DISTANT 1500
+#define MAX_DISTANT 1500*4
 
 static const char *TAG = "uart_events";
 
