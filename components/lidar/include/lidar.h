@@ -14,8 +14,8 @@ typedef struct {
 	float distant;
 } Lidar_Data;
 
-extern Lidar_Data lidar;
+extern Lidar_Data currentPoint;
 
 void lidar_init(void);
-void lidar_print();
+void lidar_print(Lidar_Data point, char* pointName);
 #endif

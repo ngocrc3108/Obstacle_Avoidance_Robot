@@ -9,43 +9,78 @@
 #include "esp_log.h"
 #include "hal/uart_hal.h"
 #include "driver/gpio.h"
+#include "math.h"
+
+#define MAX_DISTANT 1500
 
 static const char *TAG = "uart_events";
 
 static void uart_event_task(void *pvParameters);
 static void uart_init();
 static void uart_enable_interrupt();
+static void reset_lidar_value(Lidar_Data* value);
+static Lidar_Data convert_raw_data_to_lidar_data(uint8_t* raw_data);
+static uint8_t is_raw_data_valid(uint8_t* raw_data);
 
 static QueueHandle_t lidar_uart_queue;
-Lidar_Data lidar;
+Lidar_Data firstPointInNewScan;
+uint32_t point_count;
+Lidar_Data currentPoint;
+Lidar_Data lastPoint;
+Lidar_Data point_A;
+Lidar_Data point_B;
 
 static void uart_event_task(void *pvParameters)
 {
     uart_event_t event;
     uint8_t* uart_data = (uint8_t*) malloc(BUF_SIZE);
     int count  = 0;
+    
     for (;;) {
         //Waiting for UART event.
         if (xQueueReceive(lidar_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
             bzero(uart_data, BUF_SIZE);
-            ESP_LOGI(TAG, "uart[%d] event:", LIDAR_UART_NUM);
             switch (event.type) {
             case UART_DATA:
-                ESP_LOGI(TAG, "[UART DATA]: %d, COUNT: %d", event.size, count++);
                 uart_read_bytes(LIDAR_UART_NUM, uart_data, event.size, portMAX_DELAY);
 
                 // handle interrupt here
                 for(int i = 0; i <= (int)event.size - LIDAR_DATA_PACKET_SIZE; i += LIDAR_DATA_PACKET_SIZE) {
-                    uint16_t temp_distant = *(uint16_t*)(&uart_data[i + 3]);
-                    lidar.distant = (float)temp_distant / 4;
+                    uint8_t* raw_data = &uart_data[i];
+                    if((raw_data[0] & 0x03) == 0x01) {
+                        ESP_LOGI("DEBUG", "NEW SCAN");
+                        
+                        if(point_count >= 2 && fabs(lastPoint.angle - firstPointInNewScan.angle) > fabs(point_B.angle - point_A.angle)) {
+                            point_A = lastPoint;
+                            point_B = firstPointInNewScan;
+                        }
 
-                    uint16_t temp_angle_0 = (uint16_t)(uart_data[i+1]) >> 1;
-                    uint16_t temp_angle_1 = (uint16_t)(uart_data[i+2]) << 7;
-                    uint16_t temp_angle = temp_angle_0 | temp_angle_1;
-                    lidar.angle = (float)temp_angle / 64;
+                        lidar_print(point_A, "Point A");
+                        lidar_print(point_B, "Point B");
+                        ESP_LOGI("DEBUG", "point_count: %ld\n", point_count);
 
-                    ESP_LOGE("DEBUG", "i: %d", i);
-                    lidar_print();
+                        point_count = 0;
+                        reset_lidar_value(&firstPointInNewScan);
+
+                        reset_lidar_value(&point_A);
+                        reset_lidar_value(&point_B);
+                    }
+                    
+                    if(!is_raw_data_valid(raw_data)) 
+                        continue;
+
+                    lastPoint = currentPoint;
+                    currentPoint = convert_raw_data_to_lidar_data(raw_data);
+
+                    if(point_count == 0)
+                        firstPointInNewScan = currentPoint;
+
+                    if(currentPoint.angle - lastPoint.angle > point_B.angle - point_A.angle) {
+                        point_A = lastPoint;
+                        point_B = currentPoint;
+                    }
+
+                    point_count++;
                 }
 
                 break;
@@ -111,12 +146,12 @@ void lidar_init(void) {
     for(uint8_t i = 0; i < ret; i++)
         printf("%x ", buffer[i]);
         
-    if(memcmp(buffer, expected_response, sizeof(expected_response)) != 0) {
-        ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
-        return;
-    } else {
-        gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
-    }
+    // if(memcmp(buffer, expected_response, sizeof(expected_response)) != 0) {
+    //     ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
+    //     return;
+    // } else {
+    //     gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
+    // }
 
     uart_enable_interrupt();
 }
@@ -152,9 +187,32 @@ static void uart_enable_interrupt() {
     xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, 12, NULL);
 }
 
-void lidar_print() {
-    if(lidar.distant == 0)
-        ESP_LOGE(TAG, "\nangle = %f\ndistant = %f\n", lidar.angle, lidar.distant);
+void lidar_print(Lidar_Data point, char* pointName) {
+    if(point.distant == 0)
+        ESP_LOGE(pointName, "\nangle = %f\ndistant = %f\n", point.angle, point.distant);
     else
-        ESP_LOGI(TAG, "\nangle = %f\ndistant = %f\n", lidar.angle, lidar.distant);
+        ESP_LOGI(pointName, "\nangle = %f\ndistant = %f\n", point.angle, point.distant);
+}
+
+static void reset_lidar_value(Lidar_Data* value) {
+    value->angle = 0;
+    value->distant = 0;
+}
+
+static Lidar_Data convert_raw_data_to_lidar_data(uint8_t* raw_data) {
+    Lidar_Data ret;
+    uint16_t temp_distant = *(uint16_t*)(&raw_data[3]);
+    ret.distant = (float)temp_distant / 4;
+
+    uint16_t temp_angle_0 = (uint16_t)(raw_data[1]) >> 1;
+    uint16_t temp_angle_1 = (uint16_t)(raw_data[2]) << 7;
+    uint16_t temp_angle = temp_angle_0 | temp_angle_1;
+    ret.angle = (float)temp_angle / 64;
+
+    return ret;
+}
+
+static uint8_t is_raw_data_valid(uint8_t* raw_data) {
+    uint16_t temp_distant = *(uint16_t*)(&raw_data[3]);
+    return temp_distant != 0 && temp_distant < MAX_DISTANT; 
 }
