@@ -46,15 +46,15 @@ void car_go_backward() {
 void car_turn_left() {
     car_set_speed(CAR_SPEED);
 
-    wheel_forward(car.left);
-    wheel_stop(car.right);
+    wheel_forward(car.right);
+    wheel_stop(car.left); 
 }
 
 void car_turn_right() {
     car_set_speed(CAR_SPEED);
-
-    wheel_forward(car.right);
-    wheel_stop(car.left);    
+    wheel_forward(car.left);
+    wheel_stop(car.right);
+  
 }
 
 void car_stop() {
@@ -65,25 +65,24 @@ void car_stop() {
 void car_turn_by_angle(float angle) {
     if(angle > 0) {
         car_turn_right();
-        vTaskDelay(angle / 80.0 * 1000 / portTICK_PERIOD_MS); // 1s = 80*
+        //vTaskDelay(angle / 80.0 * 1000 / portTICK_PERIOD_MS); // 1s = 80*
     } else if(angle < 0) {
         car_turn_left();
-        vTaskDelay(- angle / 80.0 * 1000 / portTICK_PERIOD_MS); // 1s = 80*        
+        //vTaskDelay(- angle / 80.0 * 1000 / portTICK_PERIOD_MS); // 1s = 80*        
     }
-    car_stop();
 }
 
 void car_turn_by_angle_and_forward(float angle) {
     if(angle > 0) {
-        ESP_LOGI("DEBUG", "turn right");
+        //ESP_LOGI("DEBUG", "turn right");
         wheel_set_speed(&car.left, CAR_SPEED + (100 - CAR_SPEED)*fabs(angle) / 180.0);
         wheel_set_speed(&car.right, CAR_SPEED);
     } else if(angle < 0) {
-        ESP_LOGI("DEBUG", "turn left");
+        //ESP_LOGI("DEBUG", "turn left");
         wheel_set_speed(&car.left, CAR_SPEED);
         wheel_set_speed(&car.right, CAR_SPEED + (100 - CAR_SPEED)*fabs(angle) / 180.0);        
     } else {
-        ESP_LOGI("DEBUG", "go forward");
+        //ESP_LOGI("DEBUG", "go forward");
         car_set_speed(CAR_SPEED);
     }
 

@@ -10,8 +10,9 @@
 #include "hal/uart_hal.h"
 #include "driver/gpio.h"
 #include "math.h"
+#include "car.h"
 
-#define MAX_DISTANT 1500*4
+#define MAX_DISTANT 800
 
 static const char *TAG = "uart_events";
 
@@ -34,8 +35,7 @@ static void uart_event_task(void *pvParameters)
 {
     uart_event_t event;
     uint8_t* uart_data = (uint8_t*) malloc(BUF_SIZE);
-    int count  = 0;
-    
+
     for (;;) {
         //Waiting for UART event.
         if (xQueueReceive(lidar_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
@@ -48,19 +48,39 @@ static void uart_event_task(void *pvParameters)
                 for(int i = 0; i <= (int)event.size - LIDAR_DATA_PACKET_SIZE; i += LIDAR_DATA_PACKET_SIZE) {
                     uint8_t* raw_data = &uart_data[i];
                     if((raw_data[0] & 0x03) == 0x01) {
-                        ESP_LOGI("DEBUG", "NEW SCAN");
-                        
-                        if(point_count >= 2 && fabs(lastPoint.angle - firstPointInNewScan.angle) > fabs(point_B.angle - point_A.angle)) {
+                        float turnAngle;
+
+                        //ESP_LOGI("DEBUG", "NEW SCAN");
+
+                        if(point_count == 0) {
+                            turnAngle = 0;
+                        } else if(point_count >= 2 && fabs(lastPoint.angle - firstPointInNewScan.angle) > fabs(point_B.angle - point_A.angle)) {
                             point_A = lastPoint;
                             point_B = firstPointInNewScan;
+
+                            turnAngle = (point_B.angle + (point_A.angle - 360)) / 2;
+                        } else {
+                            turnAngle = (point_B.angle + point_A.angle) / 2;
                         }
 
-                        lidar_print(point_A, "Point A");
-                        lidar_print(point_B, "Point B");
-                        ESP_LOGI("DEBUG", "point_count: %ld\n", point_count);
+                        turnAngle = turnAngle > 180 ? turnAngle - 360 : turnAngle;
+                        ESP_LOGI("DEBUG", "turn angle: %f", turnAngle);
+
+                        // lidar_print(point_A, "Point A");
+                        // lidar_print(point_B, "Point B");
+                        // ESP_LOGI("DEBUG", "point_count: %ld\n", point_count);
 
                         point_count = 0;
                         reset_lidar_value(&firstPointInNewScan);
+
+                        if(fabs(turnAngle) < 10) {
+                            // be hon 10 do thi vua di chuyen vua xoay
+                            car_turn_by_angle_and_forward(turnAngle);
+                        }
+                        else {
+                            // lon hon 10 do thi dung yen, xoay tai cho
+                            car_turn_by_angle(turnAngle);
+                        }
 
                         reset_lidar_value(&point_A);
                         reset_lidar_value(&point_B);
@@ -71,9 +91,12 @@ static void uart_event_task(void *pvParameters)
 
                     lastPoint = currentPoint;
                     currentPoint = convert_raw_data_to_lidar_data(raw_data);
+                    //lidar_print(currentPoint, "currentPoint");
 
-                    if(point_count == 0)
+                    if(point_count == 0) {
                         firstPointInNewScan = currentPoint;
+                        //lidar_print(firstPointInNewScan, "Fisrt Point");
+                    }
 
                     if(currentPoint.angle - lastPoint.angle > point_B.angle - point_A.angle) {
                         point_A = lastPoint;
@@ -95,7 +118,7 @@ static void uart_event_task(void *pvParameters)
                 break;
             //Event of UART ring buffer full
             case UART_BUFFER_FULL:
-                ESP_LOGI(TAG, "ring buffer full");
+                ESP_LOGE(TAG, "ring buffer full");
                 // If buffer full happened, you should consider increasing your buffer size
                 // As an example, we directly flush the rx buffer here in order to read more data.
                 uart_flush_input(LIDAR_UART_NUM);
@@ -103,7 +126,7 @@ static void uart_event_task(void *pvParameters)
                 break;
             //Event of UART RX break detected
             case UART_BREAK:
-                ESP_LOGI(TAG, "uart rx break");
+                ESP_LOGE(TAG, "uart rx break");
                 break;
             //Event of UART parity check error
             case UART_PARITY_ERR:
@@ -146,12 +169,14 @@ void lidar_init(void) {
     for(uint8_t i = 0; i < ret; i++)
         printf("%x ", buffer[i]);
         
-    // if(memcmp(buffer, expected_response, sizeof(expected_response)) != 0) {
-    //     ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
-    //     return;
-    // } else {
-    //     gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
-    // }
+    if(memcmp(buffer, expected_response, sizeof(expected_response)) != 0) {
+        ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
+        return;
+    } else {
+        gpio_set_direction(2, GPIO_MODE_OUTPUT);
+        gpio_set_level(2, 1);
+        gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
+    }
 
     uart_enable_interrupt();
 }
@@ -213,6 +238,6 @@ static Lidar_Data convert_raw_data_to_lidar_data(uint8_t* raw_data) {
 }
 
 static uint8_t is_raw_data_valid(uint8_t* raw_data) {
-    uint16_t temp_distant = *(uint16_t*)(&raw_data[3]);
+    uint16_t temp_distant = *(uint16_t*)(&raw_data[3]) / 4;
     return temp_distant != 0 && temp_distant < MAX_DISTANT; 
 }

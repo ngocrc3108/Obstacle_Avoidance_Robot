@@ -2,7 +2,8 @@
 #include "lidar.h"
 
 void app_main(void) {
-    //car_init();
+    car_init();
+    //car_turn_by_angle_and_forward(180);
     lidar_init();
     // car_set_speed(CAR_SPEED);
     // car_go_backward();

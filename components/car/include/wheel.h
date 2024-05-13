@@ -8,10 +8,10 @@
 #include "driver/mcpwm.h"
 #include "soc/mcpwm_periph.h"
 
-#define WHEEL_GPIO_A_LEFT 27
-#define WHEEL_GPIO_B_LEFT  26
-#define WHEEL_GPIO_A_RIGHT 4
-#define WHEEL_GPIO_B_RIGHT 18
+#define WHEEL_GPIO_A_LEFT 32
+#define WHEEL_GPIO_B_LEFT  33
+#define WHEEL_GPIO_A_RIGHT 25
+#define WHEEL_GPIO_B_RIGHT 26
 
 typedef struct {
     mcpwm_unit_t mcpwm_unit;

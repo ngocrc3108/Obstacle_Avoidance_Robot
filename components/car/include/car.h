@@ -3,7 +3,7 @@
 
 #include "wheel.h"
 
-#define CAR_SPEED 80.0 // 0 -> 100
+#define CAR_SPEED 50.0 // 0 -> 100
 
 typedef struct {
     Wheel left;
