@@ -160,23 +160,38 @@ void lidar_init(void) {
 	uint8_t expected_response[] = {0xA5, 0x5A, 0x05, 0x00, 0x00, 0x40, 0x81};
     uint8_t buffer[100] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-    int ret = uart_write_bytes(LIDAR_UART_NUM, startCommand, sizeof(startCommand));
-    ESP_LOGI(TAG, "WRITE CMD LEN: %d", ret);
+    int tryCount = 0;
+    int isStartSuccess = 0;
+    do {
+        uart_flush_input(LIDAR_UART_NUM);
+        int ret = uart_write_bytes(LIDAR_UART_NUM, startCommand, sizeof(startCommand));
+        ESP_LOGI(TAG, "WRITE CMD LEN: %d", ret);
+        ret = uart_read_bytes(LIDAR_UART_NUM, buffer, 7, 5000 / portTICK_PERIOD_MS);
+        ESP_LOGE(TAG, "Try start count: %d", tryCount++);
+        ESP_LOGI(TAG, "READ RESPONSE LEN: %d", ret);
+        ESP_LOGI(TAG, "RESPONSE: ");
+        for(uint8_t i = 0; i < ret; i++)
+            printf("%x ", buffer[i]);
+            
+        isStartSuccess = memcmp(buffer, expected_response, sizeof(expected_response)) == 0;   
+        if(!isStartSuccess) {
+            ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        } else {
+            gpio_set_direction(2, GPIO_MODE_OUTPUT);
+            gpio_set_level(2, 1);
+            gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
+        }
 
-    ret = uart_read_bytes(LIDAR_UART_NUM, buffer, 7, 5000 / portTICK_PERIOD_MS);
-    ESP_LOGI(TAG, "READ RESPONSE LEN: %d", ret);
-    ESP_LOGI(TAG, "RESPONSE: ");
-    for(uint8_t i = 0; i < ret; i++)
-        printf("%x ", buffer[i]);
-        
-    if(memcmp(buffer, expected_response, sizeof(expected_response)) != 0) {
-        ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
+    } while(tryCount < 5 && !isStartSuccess);
+
+    if(!isStartSuccess) {
+        ESP_LOGE(TAG, "CAN NOT START LIDAR");
         return;
-    } else {
-        gpio_set_direction(2, GPIO_MODE_OUTPUT);
-        gpio_set_level(2, 1);
-        gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
     }
+
+    uart_flush_input(LIDAR_UART_NUM);
+    xQueueReset(lidar_uart_queue);
 
     uart_enable_interrupt();
 }
