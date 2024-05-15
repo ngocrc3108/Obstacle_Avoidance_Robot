@@ -12,7 +12,7 @@
 #include "math.h"
 #include "car.h"
 
-#define MAX_DISTANT 800
+#define MAX_DISTANT 2000
 
 static const char *TAG = "uart_events";
 
@@ -35,7 +35,7 @@ static void uart_event_task(void *pvParameters)
 {
     uart_event_t event;
     uint8_t* uart_data = (uint8_t*) malloc(BUF_SIZE);
-
+    int flag = 0; 
     for (;;) {
         //Waiting for UART event.
         if (xQueueReceive(lidar_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
@@ -47,6 +47,7 @@ static void uart_event_task(void *pvParameters)
                 // handle interrupt here
                 for(int i = 0; i <= (int)event.size - LIDAR_DATA_PACKET_SIZE; i += LIDAR_DATA_PACKET_SIZE) {
                     uint8_t* raw_data = &uart_data[i];
+
                     if((raw_data[0] & 0x03) == 0x01) {
                         float turnAngle;
 
@@ -73,17 +74,24 @@ static void uart_event_task(void *pvParameters)
                         point_count = 0;
                         reset_lidar_value(&firstPointInNewScan);
 
-                        if(fabs(turnAngle) < 10) {
-                            // be hon 10 do thi vua di chuyen vua xoay
-                            car_turn_by_angle_and_forward(turnAngle);
-                        }
-                        else {
-                            // lon hon 10 do thi dung yen, xoay tai cho
+                        if (flag) {
+                            if(fabs(turnAngle) < 10) {
+                                // be hon 10 do thi vua di chuyen vua xoay
+                                //car_turn_by_angle_and_forward(turnAngle);
+                            }
+                            else {
+                                // lon hon 10 do thi dung yen, xoay tai cho
+                                //car_turn_by_angle(turnAngle);
+                            }
                             car_turn_by_angle(turnAngle);
                         }
-
+                        else {
+                            car_go_forward();
+                        }
+                        
                         reset_lidar_value(&point_A);
                         reset_lidar_value(&point_B);
+                        flag = 0;
                     }
                     
                     if(!is_raw_data_valid(raw_data)) 
@@ -92,7 +100,10 @@ static void uart_event_task(void *pvParameters)
                     lastPoint = currentPoint;
                     currentPoint = convert_raw_data_to_lidar_data(raw_data);
                     //lidar_print(currentPoint, "currentPoint");
-
+                    if ((currentPoint.angle < 20 || currentPoint.angle > 340) && currentPoint.distant < 500) {
+                        flag = 1;
+                    }
+                    
                     if(point_count == 0) {
                         firstPointInNewScan = currentPoint;
                         //lidar_print(firstPointInNewScan, "Fisrt Point");
