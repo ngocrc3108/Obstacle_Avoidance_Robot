@@ -1,21 +1,18 @@
 #ifndef __LIDAR_H__
 #define __LIDAR_H__
 
-#define LIDAR_UART_NUM 				UART_NUM_2
-#define LIDAR_MOTOR_CONTROL_PIN		18
-#define LIDAR_UART_TX				17
-#define LIDAR_UART_RX				16
+#include <stdint.h>
+#include <stddef.h>
+
 #define LIDAR_DATA_PACKET_SIZE		5
-#define LIDAR_UART_QUEUE_SIZE		5*1024
-#define BUF_SIZE					5*1024
-#define RD_BUF_SIZE 				(BUF_SIZE)
+
 typedef struct {
 	float angle;
 	float distant;
 } Lidar_Data;
 
-extern Lidar_Data currentPoint;
-
 void lidar_init(void);
 void lidar_print(Lidar_Data point, char* pointName);
+void lidar_handler(uint8_t* raw_data);
+
 #endif
