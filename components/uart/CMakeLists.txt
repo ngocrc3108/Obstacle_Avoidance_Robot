@@ -1,3 +1,3 @@
 idf_component_register(SRCS "uart.c"
                     INCLUDE_DIRS "include"
-                    REQUIRES driver lidar)
+                    REQUIRES driver lidar connection)

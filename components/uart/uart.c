@@ -8,6 +8,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "lidar.h"
+#include "connection/socket.h"
 
 static void uart_event_task(void *pvParameters);
 
@@ -60,9 +61,10 @@ static void uart_event_task(void *pvParameters)
             case UART_DATA:
                 uart_read_bytes(LIDAR_UART_NUM, uart_data, event.size, portMAX_DELAY);
 
+                socket_send_async(uart_data, event.size);
+
                 for(int i = 0; i <= (int)event.size - LIDAR_DATA_PACKET_SIZE; i += LIDAR_DATA_PACKET_SIZE)
                     lidar_handler(&uart_data[i]);
-                    
                 break;
             //Event of HW FIFO overflow detected
             case UART_FIFO_OVF:
