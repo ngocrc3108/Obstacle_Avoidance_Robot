@@ -34,6 +34,10 @@
         "format": "c",
         "initializer_list": "c",
         "span": "c",
-        "regex": "c"
-    }
+        "regex": "c",
+        "freertosconfig.h": "c",
+        "lidar.h": "c",
+        "led_control.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "enabled"
 }

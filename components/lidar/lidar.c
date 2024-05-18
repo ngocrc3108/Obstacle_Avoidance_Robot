@@ -14,6 +14,7 @@
 #include "hal/uart_hal.h"
 
 #include "car.h"
+#include "led.h"
 
 #define MAX_DISTANT 800
 
@@ -31,11 +32,10 @@ Lidar_Data lastPoint;
 Lidar_Data point_A;
 Lidar_Data point_B;
 int isDangerous = 0;
-
+float turnAngle = 0;
 void lidar_handler(uint8_t* raw_data) {
 
     if((raw_data[0] & 0x03) == 0x01) {
-        float turnAngle;
 
         //ESP_LOGI("DEBUG", "NEW SCAN");
 
@@ -61,6 +61,7 @@ void lidar_handler(uint8_t* raw_data) {
         lidar_reset_value(&firstPointInNewScan);
 
         if (isDangerous) {
+            led_set_state(LED_BLINK);
             ESP_LOGE("DEBUG", "turn angle: %f", turnAngle);
             if(fabs(turnAngle) < 10) {
                 // be hon 10 do thi vua di chuyen vua xoay
@@ -72,6 +73,7 @@ void lidar_handler(uint8_t* raw_data) {
             }
         }
         else {
+            led_set_state(LED_ON);
             ESP_LOGI("DEBUG", "turn angle: %f", turnAngle);
             car_go_forward();
         }
@@ -87,7 +89,7 @@ void lidar_handler(uint8_t* raw_data) {
     lastPoint = currentPoint;
     currentPoint = lidar_convert_raw_data(raw_data);
     //lidar_print(currentPoint, "currentPoint");
-    if ((currentPoint.angle < 20 || currentPoint.angle > 340) && currentPoint.distant < 500) {
+    if ((currentPoint.angle < 30 || currentPoint.angle > 360 - 30) && currentPoint.distant < 500) {
         isDangerous = 1;
     }
     
@@ -139,8 +141,7 @@ static void lidar_start() {
             ESP_LOGI(TAG, "EXPECTED RESPONSE NOT FOUND");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         } else {
-            gpio_set_direction(2, GPIO_MODE_OUTPUT);
-            gpio_set_level(2, 1);
+            led_set_state(LED_ON);
             gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 1);
         }
 
