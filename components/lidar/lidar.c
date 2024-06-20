@@ -16,7 +16,8 @@
 #include "car.h"
 #include "led.h"
 
-#define MAX_DISTANT 800
+#define MAX_DISTANCE 1240
+#define DANGEROUS_DISTANCE 511
 
 static void lidar_start();
 static void lidar_reset_value(Lidar_Data* value);
@@ -33,6 +34,7 @@ Lidar_Data point_A;
 Lidar_Data point_B;
 int isDangerous = 0;
 float turnAngle = 0;
+
 void lidar_handler(uint8_t* raw_data) {
 
     if((raw_data[0] & 0x03) == 0x01) {
@@ -89,7 +91,7 @@ void lidar_handler(uint8_t* raw_data) {
     lastPoint = currentPoint;
     currentPoint = lidar_convert_raw_data(raw_data);
     //lidar_print(currentPoint, "currentPoint");
-    if ((currentPoint.angle < 30 || currentPoint.angle > 360 - 30) && currentPoint.distant < 500) {
+    if ((currentPoint.angle < 30 || currentPoint.angle > 360 - 30) && currentPoint.distant < DANGEROUS_DISTANCE) {
         isDangerous = 1;
     }
     
@@ -180,5 +182,5 @@ static Lidar_Data lidar_convert_raw_data(uint8_t* raw_data) {
 
 static uint8_t lidar_is_raw_data_valid(uint8_t* raw_data) {
     uint16_t temp_distant = *(uint16_t*)(&raw_data[3]) / 4;
-    return temp_distant != 0 && temp_distant < MAX_DISTANT; 
+    return temp_distant != 0 && temp_distant < MAX_DISTANCE; 
 }
