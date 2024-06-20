@@ -28,6 +28,7 @@
 #include "uart.h"
 #include "driver/uart.h"
 #include "hal/uart_hal.h"
+#include "lidar.h"
 
 #define PORT                        3333
 #define KEEPALIVE_IDLE              5
@@ -124,9 +125,14 @@ static void socket_listen_task(void* para)
     uint8_t rx_buffer[128];
     do {
         len = socket_receive(rx_buffer, sizeof(rx_buffer));
-        uart_write_bytes(LIDAR_UART_NUM, rx_buffer, len);
-        ESP_LOGI("DEBUG", "socket listen: %d bytes.", len);
-        print_hex(rx_buffer, len);
+        if(len == 2 && rx_buffer[0] == 0xA5 && rx_buffer[1] == 0x20) {
+            lidar_start();
+        } 
+        else {
+            uart_write_bytes(LIDAR_UART_NUM, rx_buffer, len);
+            ESP_LOGI("DEBUG", "socket listen: %d bytes.", len);
+            print_hex(rx_buffer, len);
+        }
     } while(len >= 0);
 
     ESP_LOGE("DEBUG", "delete task");

@@ -12,7 +12,7 @@
 
 void app_main(void) {        
     led_init();
-    car_init();
+    //car_init();
 
     uart_init();
     uart_enable_interrupt();

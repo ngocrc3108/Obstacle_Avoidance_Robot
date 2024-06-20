@@ -19,7 +19,6 @@
 #define MAX_DISTANCE 1240
 #define DANGEROUS_DISTANCE 511
 
-static void lidar_start();
 static void lidar_reset_value(Lidar_Data* value);
 static Lidar_Data lidar_convert_raw_data(uint8_t* raw_data);
 static uint8_t lidar_is_raw_data_valid(uint8_t* raw_data);
@@ -113,14 +112,9 @@ void lidar_init(void) {
 
     gpio_set_direction(LIDAR_MOTOR_CONTROL_PIN, GPIO_MODE_OUTPUT);
     gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 0);
-
-    uart_init();
-    lidar_start();
-    uart_enable_interrupt();
-
 }
 
-static void lidar_start() {
+void lidar_start() {
     uint8_t startCommand[] = {0xA5, 0x20};
 	uint8_t expected_response[] = {0xA5, 0x5A, 0x05, 0x00, 0x00, 0x40, 0x81};
     uint8_t buffer[100] = {0, 0, 0, 0, 0, 0, 0, 0};

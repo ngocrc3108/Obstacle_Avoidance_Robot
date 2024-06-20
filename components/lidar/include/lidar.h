@@ -14,5 +14,6 @@ typedef struct {
 void lidar_init(void);
 void lidar_print(Lidar_Data point, char* pointName);
 void lidar_handler(uint8_t* raw_data);
+void lidar_start();
 
 #endif
