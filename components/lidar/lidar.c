@@ -112,6 +112,8 @@ void lidar_init(void) {
 
     gpio_set_direction(LIDAR_MOTOR_CONTROL_PIN, GPIO_MODE_OUTPUT);
     gpio_set_level(LIDAR_MOTOR_CONTROL_PIN, 0);
+
+    lidar_start();
 }
 
 void lidar_start() {

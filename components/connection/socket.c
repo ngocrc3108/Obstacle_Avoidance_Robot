@@ -46,7 +46,6 @@ static int sock;
 int listen_sock;
 
 static void print_hex(uint8_t* data, size_t len);
-static void socket_listen_task(void* para);
 static void socket_send_async_task(void* para);
 
 static void print_hex(uint8_t* data, size_t len) {
@@ -116,27 +115,6 @@ void socket_send(uint8_t* data, size_t len) {
         }
         to_write -= written;
     }
-}
-
-static void socket_listen_task(void* para)
-{
-    ESP_LOGW("SOCKET", "running\n");
-    int len = 0;
-    uint8_t rx_buffer[128];
-    do {
-        len = socket_receive(rx_buffer, sizeof(rx_buffer));
-        if(len == 2 && rx_buffer[0] == 0xA5 && rx_buffer[1] == 0x20) {
-            lidar_start();
-        } 
-        else {
-            uart_write_bytes(LIDAR_UART_NUM, rx_buffer, len);
-            ESP_LOGI("DEBUG", "socket listen: %d bytes.", len);
-            print_hex(rx_buffer, len);
-        }
-    } while(len >= 0);
-
-    ESP_LOGE("DEBUG", "delete task");
-    vTaskDelete(NULL);
 }
 
 void tcp_server_init() {
@@ -211,8 +189,23 @@ CLEAN_UP:
     //close(listen_sock);
 }
 
-void socket_start_listen() {
-    xTaskCreate(socket_listen_task, "socket_listen_task", 10*1024, NULL, 1, NULL);
+esp_err_t socket_start_listen() {
+    ESP_LOGW("SOCKET", "running\n");
+    int len = 0;
+    uint8_t rx_buffer[128];
+    do {
+        len = socket_receive(rx_buffer, sizeof(rx_buffer));
+        if(len == 2 && rx_buffer[0] == 0xA5 && rx_buffer[1] == 0x20) {
+            ESP_LOGI("DEBUG", "receive start command from robostudio");
+            return ESP_OK;
+        } 
+        else {
+            uart_write_bytes(LIDAR_UART_NUM, rx_buffer, len);
+            ESP_LOGI("DEBUG", "socket listen: %d bytes.", len);
+            print_hex(rx_buffer, len);
+        }
+    } while(len >= 0);
+    return ESP_FAIL;
 }
 
 void socket_send_async(uint8_t* data, size_t len) {

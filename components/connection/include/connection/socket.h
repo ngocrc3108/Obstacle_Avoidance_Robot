@@ -3,11 +3,12 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <esp_err.h>
 
 int socket_receive(uint8_t* data, size_t len);
 void socket_send(uint8_t* data, size_t len);
 void socket_start_send_async();
 void socket_send_async(uint8_t* data, size_t len);
 void tcp_server_init();
-void socket_start_listen();
+esp_err_t socket_start_listen();
 #endif

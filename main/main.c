@@ -12,7 +12,6 @@
 
 void app_main(void) {        
     led_init();
-    //car_init();
 
     uart_init();
     uart_enable_interrupt();
@@ -20,8 +19,13 @@ void app_main(void) {
     wifi_init_sta();
     socket_start_send_async();
     tcp_server_init();
-    socket_start_listen();
+    esp_err_t ret = socket_start_listen();
 
-    lidar_init();
-    //lidar_start();
+    if(ret == ESP_OK) {
+        lidar_init();
+        car_init();
+    }
+    else {
+        ESP_LOGI("DEBUG", "socket fail");
+    }
 }
